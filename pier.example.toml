@@ -1,0 +1,43 @@
+# Pier configuration. Copy to `pier.toml` and pass it with `--config pier.toml`
+# (or set PIER_CONFIG, or run from the directory that contains it).
+# Every key is optional; the values below are the defaults.
+#
+# Environment overrides: PIER_BIND, PIER_DATA_DIR, DOCKER_HOST, DOCKER_CERT_PATH,
+# DOCKER_TLS_VERIFY.
+
+# Address to listen on. Loopback only by default; there is no built-in HTTPS in Phase 1,
+# so put a reverse proxy in front before binding anything else.
+bind = "127.0.0.1:8640"
+
+# Where the SQLite database lives. Defaults per OS:
+#   Windows: %APPDATA%\Pier
+#   macOS:   ~/Library/Application Support/Pier
+#   Linux:   /var/lib/pier
+# data_dir = "/var/lib/pier"
+
+# Set to true when Pier is served through an HTTPS reverse proxy.
+cookie_secure = false
+
+# How long a login stays valid, in hours.
+session_ttl_hours = 24
+
+[docker]
+# Leave unset to use the platform default:
+#   Windows: npipe:////./pipe/docker_engine
+#   macOS:   ~/.docker/run/docker.sock (Docker Desktop), else /var/run/docker.sock
+#   Linux:   unix:///var/run/docker.sock
+# Other options:
+#   host = "unix:///var/run/docker.sock"
+#   host = "tcp://127.0.0.1:2375"          # plain TCP, only on trusted networks
+#   host = "https://docker.example:2376"   # TLS, needs cert_path
+#   host = "ssh://user@docker.example"     # unix hosts only, uses the system ssh binary
+# host = "unix:///var/run/docker.sock"
+
+# Directory with ca.pem, cert.pem and key.pem for TLS (defaults to ~/.docker).
+# cert_path = "/etc/pier/certs"
+
+# Upgrade tcp:// hosts to TLS (same meaning as DOCKER_TLS_VERIFY).
+# tls_verify = false
+
+# Per-request timeout in seconds.
+# timeout_secs = 120

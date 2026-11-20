@@ -1,0 +1,6 @@
+/target
+/crates/web/dist
+*.db
+*.db-shm
+*.db-wal
+/pier.toml

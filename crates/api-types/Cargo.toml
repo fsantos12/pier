@@ -1,0 +1,22 @@
+[package]
+name = "pier-api-types"
+description = "Request and response DTOs shared by pier-server and pier-web (serde only, WASM-safe)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# Derives `utoipa::ToSchema` so the server can publish OpenAPI. Never enabled for WASM.
+openapi = ["dep:utoipa"]
+
+[dependencies]
+serde.workspace = true
+utoipa = { version = "6", optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true

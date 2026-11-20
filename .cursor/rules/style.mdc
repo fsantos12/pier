@@ -1,0 +1,66 @@
+---
+description: Pier code style, linting and comment rules (owner: Cleanie Pier)
+globs: "**/*.rs"
+alwaysApply: false
+---
+# Style for Pier
+
+Architecture lives in architecture.mdc, Rust patterns in rust-patterns.mdc, tests in testing.mdc.
+This file covers how code looks, reads and lints.
+
+## Formatting and lints (CI gate on Windows, macOS and Linux)
+- `cargo fmt --all -- --check` passes. rustfmt defaults (stable channel); no `rustfmt.toml` unless Filipe asks.
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes on all three OS targets.
+  Linux-only code (pier-traffic, eBPF) is also checked with its feature off so Windows and macOS stay clean.
+- Lints are declared once in the root `Cargo.toml` and inherited by every crate:
+  ```toml
+  [workspace.lints.rust]
+  unsafe_code = "deny"            # pier-traffic may override to "allow" for aya, with SAFETY comments
+  missing_docs = "warn"
+  unused_qualifications = "warn"
+
+  [workspace.lints.clippy]
+  all = { level = "warn", priority = -1 }
+  pedantic = { level = "warn", priority = -1 }
+  unwrap_used = "warn"
+  expect_used = "warn"
+  dbg_macro = "warn"
+  todo = "warn"
+  print_stdout = "warn"
+  module_name_repetitions = "allow"
+  missing_errors_doc = "allow"    # until error docs are written; remove once core is stable
+  ```
+  Each crate's `Cargo.toml` has `[lints] workspace = true`.
+- `#[allow(...)]` only on the smallest item, never crate-wide, with a `// Reason:` comment. Prefer `#[expect(...)]` (Rust 1.81+) so stale allows get flagged.
+
+## Naming
+- snake_case for functions, modules, variables; CamelCase for types and traits; SCREAMING_SNAKE_CASE for consts and statics.
+- Acronyms as one word: `HttpApi`, `TlsConfig`, `WsHub`, not `HTTPApi`.
+- Names say what, not how: `container_logs`, not `get_data`. No Hungarian prefixes, no `_impl`/`Manager` filler.
+- Getters have no `get_` prefix (`fn name(&self)`); conversions follow `as_`/`to_`/`into_`; constructors are `new`/`with_*`/`from_*`.
+- Booleans read as questions: `is_running`, `has_tls`.
+
+## Structure
+- One concept per module; split a file when it passes roughly 400 lines or mixes concerns.
+- Import order (rustfmt groups): `std`, external crates, then `crate`/workspace crates. No glob imports except `use super::*` in tests and preludes.
+- Keep functions short and flat: early returns and `?` over nested `if`/`match`; `let ... else` for guard clauses.
+- Prefer iterators over index loops; borrow (`&str`, `&[T]`) in arguments, own in struct fields.
+- No dead code, commented-out code or leftover `println!`/`dbg!`. Logging goes through `tracing`.
+- Platform code behind `#[cfg(...)]` blocks kept small, one per module where possible.
+
+## Errors
+- Return `Result<T, pier_core::Error>` from library code; `?` for propagation; no `unwrap`/`expect` outside tests (an `expect` with an invariant message is allowed only where a panic is truly impossible, with `// Invariant:` comment).
+- Error messages are lowercase, no trailing period (`"container not found"`).
+
+## Comments and docs (all in English)
+- `//!` crate/module doc at the top of every `lib.rs` and public module: what it is for, in one or two sentences.
+- `///` on every public item. First line is a one-sentence summary in third person ("Returns the ..."). Add `# Errors`, `# Panics`, `# Safety` sections when they apply, and an `# Examples` block for main public APIs.
+- Inline `//` comments explain why, never restate what the code does.
+- Every `unsafe` block has a `// SAFETY:` comment.
+- `TODO(name): ...` only with an owner; none on branches heading to `test` or `main`.
+
+## Cleanup pass (Cleanie Pier, after Hunter's tests pass, before the PR into dev)
+1. Run fmt and clippy as above; fix every warning.
+2. Remove redundant logic, dead code and needless clones/allocations.
+3. Improve naming and module layout; add or fix doc comments.
+4. Re-run the test suite; behaviour must not change. Anything that changes behaviour goes back to Filipe and Hunter.

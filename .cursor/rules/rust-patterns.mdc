@@ -1,0 +1,58 @@
+---
+description: Pier Rust patterns (owner: Dever Pier). Patterns actually used in Phase 1.
+globs: "**/*.rs"
+alwaysApply: false
+---
+# Rust patterns for Pier
+Style, lints, naming and docs live in style.mdc; tests in testing.mdc. This file covers structure only.
+
+## Crates and boundaries
+- Packages are `pier-core`, `pier-api-types`, `pier-server`, `pier-web` (folders `crates/core`, ...).
+- `pier-core` has no HTTP or DB dependency and returns its own `model::*` types, never bollard types.
+  `pier-api-types` holds the wire types (serde only, WASM-safe, `deny_unknown_fields` on requests).
+  `pier-server` converts core -> api types with plain functions in `api/dto.rs` (both crates are
+  foreign to it, so no `From` impls). `pier-web` depends on `pier-api-types` only.
+- All Docker access goes through `pier_core::docker::DockerApi`. No bollard calls outside core.
+
+## Docker wrapper
+- `DockerApi` (async-trait) is the interface; `DockerClient` is the bollard implementation, split per
+  resource in `docker/{networks,volumes,containers,images}.rs` as inherent `<kind>_<op>` methods that
+  the trait impl in `docker/mod.rs` delegates to. `FakeDocker` (`test-util` feature) is the test double.
+- Validate first, then connect: every method calls `pier_core::validate::*` before touching bollard
+  (names and ids end up in URL paths). The server validates again at the edge to return 400 early.
+- bollard client is created lazily (`DockerClient::docker()`); a missing socket is `Unavailable`, not a
+  startup failure. HTTP 304 from start/stop is success. Create requests carry only image/name/cmd.
+- Connection settings: `ConnectionConfig` -> `Endpoint::parse` (pure, testable) -> `connection::connect`
+  (the only place that applies platform limits: unix sockets and ssh behind `cfg(unix)`, named pipes
+  behind `cfg(windows)`; the unsupported branch returns `InvalidConfig`). `Endpoint::parse` itself is
+  platform-independent so every scheme is unit-tested on every OS.
+
+## Errors
+- Library: one `pier_core::CoreError` (alias `Error`) with coarse variants (InvalidInput, NotFound,
+  Conflict, Forbidden, Unavailable, InvalidConfig, Docker); `From<bollard::errors::Error>` classifies.
+- Server: `ApiError` wraps `CoreError` plus auth/HTTP cases. `core_status()` in `server/src/error.rs` is
+  the only CoreError -> status mapping. 5xx bodies are generic (details go to `tracing`). Binaries use
+  `anyhow`; the HTTP layer never does.
+
+## Server state and handlers
+- `AppState { docker: Arc<dyn DockerApi>, db: SqlitePool, config: Arc<Config>, limiter: Arc<LoginLimiter> }`
+  is the only axum state (the trait object, not `Arc<DockerClient>`, is what lets tests inject a fake).
+- Handlers are thin: validate -> `state.docker.<op>()` -> convert with `dto::*`. Request bodies use
+  `ApiJson<T>` (JSON error body, `deny_unknown_fields` -> 422).
+- Router: public routes, protected routes behind `route_layer(require_auth)`, `csrf_guard` on the whole
+  `/api` tree, `/api` fallback is a JSON 404, everything else falls to `assets::serve` (SPA fallback that
+  never answers `/api/*`). `build_app(state)` in `lib.rs` lets tests drive the real router with `oneshot`.
+- Auth: argon2id via `spawn_blocking`; unknown users verify a dummy hash; sessions store the SHA-256 of
+  the token; the first admin is inserted with one `INSERT ... WHERE NOT EXISTS` statement.
+- Config: `FileConfig` (pier.toml, unknown keys rejected) + injected env closure -> `Config::resolve`.
+
+## Platform and features
+- Platform code behind `cfg(unix)` / `cfg(windows)` / `cfg(target_os)` in small private functions; the
+  default build and `cargo check --target x86_64-pc-windows-gnu` must stay green.
+- Future: streams (logs, stats, events) use one upstream Docker stream per container fanned out through
+  `tokio::sync::broadcast`, started on first subscriber and stopped after the last.
+
+## Web (Leptos CSR)
+- All calls go through `web/src/api.rs` (JSON content type always set; 401 redirects to /login).
+- Pages own their signals and a `refresh` counter that re-runs the `LocalResource`; create forms take
+  one argument per line for commands (no shell parsing).
