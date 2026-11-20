@@ -3,7 +3,7 @@ description: Pier architecture (owner: Stormie Pier). Starting point; Stormie re
 alwaysApply: true
 ---
 # Pier architecture
-Source of truth: blueprints/00-plan.md plus approved blueprints (01-foundation.md).
+Source of truth: docs/blueprints/00-plan.md plus approved blueprints (docs/blueprints/01-foundation.md).
 - Cross-platform Rust app (Windows, macOS, Linux); PierOS distro is optional packaging of the same binary.
 - Cargo workspace under crates/: api-types (serde DTOs shared by server and web, WASM-safe), core (Docker via bollard, topology, no HTTP), server (axum REST + WebSockets, stream hub on tokio broadcast), traffic (eBPF via aya, Linux-only, feature-gated), web (Rust/WASM UI with Leptos; three.js 3D map via JS interop). gRPC (tonic) later on top of core.
 - Crate package names use the pier- prefix (pier-core, pier-api-types, pier-server, pier-web); folders are crates/<name>.

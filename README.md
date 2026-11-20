@@ -3,7 +3,7 @@
 A cross-platform (Windows, macOS, Linux) Rust app that manages Docker networks, volumes and
 containers from a web UI over HTTP. One binary serves the REST API and the embedded UI.
 Later phases add WebSockets, logs, metrics, a 3D topology map and traffic monitoring;
-the long-term plan is in `blueprints/00-plan.md`, this phase in `blueprints/01-foundation.md`.
+the long-term plan is in `docs/blueprints/00-plan.md`, this phase in `docs/blueprints/01-foundation.md`.
 
 ## Layout
 
