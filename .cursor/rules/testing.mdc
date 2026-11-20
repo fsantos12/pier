@@ -1,0 +1,48 @@
+---
+description: Pier testing rules (owner: Hunter Pier). Read before writing or reviewing tests.
+globs: "**/*.rs"
+alwaysApply: false
+---
+# Testing for Pier
+
+## Layout and tooling
+- Unit tests in a `#[cfg(test)] mod tests` next to the code; integration tests in each crate's `tests/`; stress tests in `tests/stress_*.rs` marked `#[ignore = "stress"]`.
+- Runner: `cargo nextest run --workspace` (plain `cargo test` must also pass). Async tests use `#[tokio::test]`; time-dependent tests use `tokio::time::pause()` instead of real sleeps.
+- Shared helpers (fixtures, mock Docker, test server, WS client) live in a dev-only `pier-test-utils` crate, never in production crates.
+- Coverage with `cargo llvm-cov`; new code in core and server should not lower it.
+
+## Unit tests (no Docker)
+- pier-core exposes a Docker trait over the bollard wrapper; unit tests use a mock (mockall or a hand-written fake). No unit test touches a real socket, network or filesystem outside a tempdir.
+- Server handlers are tested in-process with `tower::ServiceExt::oneshot` against the axum router built on the mock.
+- Assert exact `pier_core::Error` variants and HTTP status codes; never compare error strings.
+- Every public function gets the happy path plus the edge cases listed in its blueprint's edge-cases section; each listed case maps to at least one named test.
+
+## Integration tests (real daemon)
+- Marked `#[ignore = "needs docker"]`; run with `cargo nextest run --run-ignored all` where Docker is available.
+- Every resource a test creates is named `pier-test-<uuid>-...` and labelled `pier.test=1`; cleanup runs in a Drop guard so it happens even on panic. CI runs a final sweep that deletes anything labelled `pier.test=1`.
+- Use small pinned images (e.g. `alpine:3.20`, `busybox`); never `latest`.
+- Tests must be parallel-safe: unique names, no shared global state, no fixed host ports (bind port 0).
+
+## Connection paths
+- Linux: Unix socket `/var/run/docker.sock`. Windows: named pipe `//./pipe/docker_engine`. macOS: `~/.docker/run/docker.sock`. Remote: `DOCKER_HOST` tcp+TLS and ssh.
+- Unit-test config parsing for every scheme, including bad URLs, missing certs and unreachable hosts (must fail with a clear error, not hang: assert a timeout).
+- CI matrix runs integration tests on Linux and Windows runners; macOS runs unit tests.
+
+## Security (always tested, never skipped)
+- Auth: every REST route and every WebSocket upgrade rejects missing, expired, malformed and tampered tokens (401) before touching Docker. A test enumerates the router's routes so a new unauthenticated route fails CI.
+- WebSocket: auth checked at upgrade (not after first message); Origin header checked; a revoked session closes open sockets.
+- Injection: container, network and volume names validated against Docker's charset; table tests with `;`, `$()`, backticks, `../`, newlines, NUL, unicode look-alikes and very long names. Entrypoint scripts are stored and mounted as files, never interpolated into a shell command line.
+- Bind mounts: reject or require explicit allow-list for host paths such as `/`, `/etc`, `/var/run/docker.sock`; test `privileged`, `pid=host`, `network=host` and cap-add are refused unless allowed.
+- Passwords hashed with argon2; tests check no secret appears in logs, error bodies or the audit log.
+- Fuzz request parsing and name validation with `cargo fuzz` (proptest for quicker property tests in CI).
+
+## Streams and stress (gate before dev -> test)
+- Stream hub: one upstream Docker stream per container regardless of client count; stream starts on first subscriber and stops after the last leaves (assert via mock call counts).
+- Slow clients: a lagging broadcast receiver gets `Lagged` handling and never blocks other clients or grows memory unbounded.
+- Stress: 500+ concurrent WebSocket clients on logs and stats; 1h-equivalent log stream (fast-forwarded) with flat memory; rapid connect/disconnect churn; container removed mid-stream ends sockets cleanly.
+- Record p95 latency and peak RSS in the test output so regressions are visible.
+
+## Gates
+- feature -> dev: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, all unit tests green on Linux, Windows and macOS.
+- dev -> test: integration and stress tests green on Linux and Windows against a real daemon, no leftover `pier.test=1` resources.
+- hotfix: a regression test that fails before the fix and passes after, named `regression_<issue>`.

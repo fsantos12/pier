@@ -1,0 +1,21 @@
+[package]
+name = "pier-web"
+description = "Pier web UI (Leptos, client-side rendered, built with Trunk)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+pier-api-types = { path = "../api-types" }
+console_error_panic_hook = "0.1"
+gloo-net = { version = "0.8", default-features = false, features = ["http", "json"] }
+leptos = { version = "0.8", features = ["csr"] }
+leptos_router = "0.8"
+serde.workspace = true
+serde_json.workspace = true
+web-sys = { version = "0.3", features = ["Window", "Location"] }

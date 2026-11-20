@@ -1,0 +1,43 @@
+---
+description: Git flow, branch naming and PR rules for pier (owner: Gittie Pier)
+alwaysApply: true
+---
+
+# Git flow for pier
+
+Repository: https://github.com/fsantos12/pier (repo not created yet)
+
+## Long-lived branches
+- `main`, `test` and `dev` must be protected (ruleset to create with the repo):
+  pull request required, no force pushes, no deletion. Never push to them directly.
+- Promotion order: `feature/<name>` -> `dev` -> `test` -> `main`.
+
+## Short-lived branches
+- `feature/<name>`: cut from `dev`, merged into `dev` by PR.
+  `<name>` is short kebab-case and matches the blueprint header (e.g. `feature/core`).
+- `hotfix/<name>`: cut from `main`, merged by PR into `main`, then `test`, then `dev`.
+  Every hotfix carries a regression test (Hunter Pier).
+
+## Who does what
+- Filipe commits and pushes code.
+- Dever Pier may also commit and push, but only to `feature/*` branches, never to
+  `main`, `test` or `dev`. Keep commits small and post the touched files in the
+  pier group after each push.
+- No other bot pushes to the repository.
+- Gittie Pier creates branches and opens every PR with a descriptive summary,
+  flagging breaking changes and security notes. Filipe approves and merges or rejects.
+- Dever Pier shares snippets in chat, or pushes them to the feature branch when Filipe is away.
+- Rule files prepared by bots in /workspace/pier are pushed by Filipe.
+
+## Per-feature order
+1. Stormie Pier: blueprint approved, names the `feature/<name>` branch.
+2. Gittie Pier: creates the branch from `dev` and announces it in the group.
+3. Filipe codes (Dever Pier helps on request).
+4. Hunter Pier: unit tests and clippy pass (gate for feature -> dev).
+5. Cleanie Pier: cleanup pass on the feature branch.
+6. Gittie Pier: opens the PR into `dev`.
+7. Before `dev` -> `test`: integration and stress tests pass (Hunter Pier).
+
+## Commits and PRs
+- Commit messages and PR text in English, imperative mood ("Add query AST").
+- One feature per PR; delete the feature branch after merge.

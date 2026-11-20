@@ -1,0 +1,14 @@
+# Build with `trunk build --release` (output in `dist/`, embedded by pier-server),
+# or run `trunk serve` for live reload with API calls proxied to a local Pier.
+
+[build]
+target = "index.html"
+dist = "dist"
+public_url = "/"
+
+[serve]
+addresses = ["127.0.0.1"]
+port = 8080
+
+[[proxy]]
+backend = "http://127.0.0.1:8640/api/"
